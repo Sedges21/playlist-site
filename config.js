@@ -14,5 +14,5 @@ window.APP_CONFIG = {
   GOOGLE_CLIENT_ID: "332182399136-efvf7i0u9ugo9umo78qmcbl46uv7k7dk.apps.googleusercontent.com",
 
   // 첫 화면 상단 제목
-  SITE_TITLE: "Playlists",
+  SITE_TITLE: "연청율 Playlists",
 };
