@@ -89,7 +89,8 @@
   body.has-date .cover { width: clamp(150px, min(28vw, calc(100vh - 590px)), 420px); }
   .volume button { background: none; border: 0; color: #fff; cursor: pointer; display: grid; }
   .volume svg { width: 22px; height: 22px; fill: currentColor; }
-  .volume input[type=range] { width: 140px; height: 5px; }
+  .volume input[type=range] { width: 140px; height: 5px;
+    background: linear-gradient(#fff, #fff) 0/var(--p, 0%) 100% no-repeat, rgba(255,255,255,.45); }   /* 음량만큼 흰색으로 채움 */
   .volume input[type=range]::-webkit-slider-thumb { width: 14px; height: 14px; }
   .volume input[type=range]::-moz-range-thumb { width: 14px; height: 14px; }
 
