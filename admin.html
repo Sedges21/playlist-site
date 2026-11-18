@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="robots" content="noindex">
+<title>플레이리스트 관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #121212; --panel: #1e1e1e; --line: rgba(255,255,255,.12); --accent: #e6e6e6; --danger: #ef8a80; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Gowun Dodum', 'Apple SD Gothic Neo', sans-serif; background: var(--bg); color: #ececec; color-scheme: dark;
+         -webkit-font-smoothing: antialiased; min-height: 100vh; }
+  button, input, textarea { font: inherit; color: inherit; }
+  .hidden { display: none !important; }
+
+  a.btn { color: inherit; text-decoration: none; }
+  .btn { background: rgba(255,255,255,.1); border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px; cursor: pointer; }
+  .btn:hover { background: rgba(255,255,255,.18); }
+  .btn.primary { background: var(--accent); color: #121212; border-color: transparent; }
+  .btn.primary:hover { filter: brightness(1.05); }
+  .btn.danger { color: var(--danger); border-color: rgba(229,139,122,.4); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.small { padding: 4px 9px; font-size: 13px; border-radius: 8px; }
+
+  input[type=text], input[type=email], input[type=password], input[type=number], input[type=url], input[type=date] {
+    width: 100%; background: #2a2a2a; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; outline: none; }
+  input:focus { border-color: var(--accent); }
+  label.field { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+  label.field > span { opacity: .8; }
+  .hint { font-size: 12px; opacity: .6; line-height: 1.5; }
+
+  /* 로그인 */
+  .login { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+  .login form { width: min(380px, 100%); background: var(--panel); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 14px; }
+  .login h1 { font-weight: 400; font-size: 22px; }
+  .err { color: var(--danger); font-size: 13px; min-height: 1em; }
+
+  /* 관리 화면 */
+  header { display: flex; align-items: center; gap: 12px; padding: 16px 24px; border-bottom: 1px solid var(--line); }
+  header h1 { font-weight: 400; font-size: 20px; flex: 1; }
+  header .who { font-size: 13px; opacity: .65; }
+  .layout { display: grid; grid-template-columns: 300px 1fr; min-height: calc(100vh - 65px); }
+  aside { border-right: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+  .item { display: flex; gap: 10px; align-items: center; padding: 8px; border-radius: 10px; cursor: pointer; border: 1px solid transparent; }
+  .item:hover { background: rgba(255,255,255,.06); }
+  .item .grip { cursor: grab; opacity: .35; font-size: 14px; letter-spacing: -2px; padding: 0 2px; user-select: none; }
+  .item:hover .grip { opacity: .8; }
+  .item.dragging { opacity: .4; }
+  .item.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+  .item.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+  .item.sel { background: rgba(255,255,255,.1); border-color: var(--line); }
+  .item .th { width: 48px; height: 48px; border-radius: 8px; background: rgba(255,255,255,.1) center/cover; flex: none; }
+  .item .meta { min-width: 0; flex: 1; }
+  .item .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .sub { font-size: 12px; opacity: .6; }
+  .badge { font-size: 11px; padding: 1px 6px; border-radius: 6px; background: rgba(229,139,122,.25); color: var(--danger); margin-left: 4px; }
+
+  main { padding: 24px 28px 60px; max-width: 980px; }
+  .editor { display: grid; grid-template-columns: 220px 1fr; gap: 28px; }
+  .cover-box { display: flex; flex-direction: column; gap: 10px; }
+  .cover-prev { width: 220px; height: 220px; border-radius: 18px; background: rgba(255,255,255,.08) center/cover;
+                display: grid; place-items: center; font-size: 13px; opacity: .9; border: 1px dashed var(--line); }
+  .cover-prev.has { border: 0; }
+  .fields { display: flex; flex-direction: column; gap: 16px; }
+  .row { display: flex; gap: 10px; align-items: flex-end; }
+  .row > .grow { flex: 1; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+
+  .tracks-head { display: flex; align-items: center; gap: 10px; margin: 28px 0 10px; }
+  .tracks-head h2 { font-weight: 400; font-size: 18px; flex: 1; }
+  .tracks { display: flex; flex-direction: column; gap: 6px; }
+  .tr { display: grid; grid-template-columns: 32px 1fr auto auto; gap: 8px; align-items: center; }
+  .tr .no { font-size: 13px; opacity: .55; text-align: right; }
+  .tr input { padding: 6px 10px; }
+  .tr .vid { font-size: 11px; opacity: .45; width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tr .acts { display: flex; gap: 4px; }
+  .empty-tracks { font-size: 14px; opacity: .6; padding: 10px 0; }
+
+  /* 배경 색 */
+  .theme-sec { margin-top: 28px; }
+  .theme-wrap { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+  .preview { position: relative; width: 352px; height: 198px; border-radius: 12px; overflow: hidden; flex: none;
+             background: #2a2a2a; border: 1px solid var(--line); }
+  .preview .pbg { position: absolute; inset: -20px; background: center/cover; filter: blur(14px); transform: scale(1.05); }
+  .preview.plain .pbg { filter: blur(24px) saturate(.55); }
+  .preview .ptint { position: absolute; inset: 0; display: none;
+    background: linear-gradient(115deg, rgba(150,100,75,.78) 0%, rgba(185,165,160,.5) 50%, rgba(175,160,165,.4) 70%, rgba(150,105,80,.72) 100%); }
+  .preview.plain .ptint { display: block; }
+  .preview .pcov { position: absolute; left: 18%; top: 15.7%; width: 27%; aspect-ratio: 1; border-radius: 7px;
+                   background: rgba(255,255,255,.2) center/cover; box-shadow: 3px 3px 0 rgba(0,0,0,.1); }
+  .preview .plines { position: absolute; left: 60%; top: 9%; right: 6%; display: flex; flex-direction: column; gap: 5px; }
+  .preview .plines i { display: block; height: 4px; border-radius: 2px; background: rgba(255,255,255,.75); }
+  .swatches { display: grid; grid-template-columns: repeat(3, 44px); gap: 6px; }
+  .swatches input[type=color] { width: 44px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 6px;
+                                background: none; cursor: pointer; }
+  .swatches input[type=color]:disabled { opacity: .3; cursor: default; }
+  .theme-side { display: flex; flex-direction: column; gap: 10px; }
+  .theme-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .savebar { display: flex; gap: 10px; margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .savebar .space { flex: 1; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(40,40,40,.97);
+           padding: 10px 18px; border-radius: 10px; font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 20; max-width: 90vw; }
+  .toast.show { opacity: 1; }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); max-height: 260px; }
+    .editor { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<section class="login hidden" id="loginView">
+  <form id="loginForm">
+    <h1>플레이리스트 관리</h1>
+    <label class="field"><span>이메일</span><input type="email" id="email" autocomplete="username" required></label>
+    <label class="field"><span>비밀번호</span><input type="password" id="password" autocomplete="current-password" required></label>
+    <div class="err" id="loginErr"></div>
+    <button class="btn primary" type="submit" id="loginBtn">로그인</button>
+  </form>
+</section>
+
+<!-- 관리 화면 -->
+<section class="hidden" id="adminView">
+  <header>
+    <h1>플레이리스트 관리</h1>
+    <span class="who" id="who"></span>
+    <a class="btn small" href="index.html" target="_blank" rel="noopener">사이트 보기</a>
+    <button class="btn small" id="logoutBtn">로그아웃</button>
+  </header>
+  <div class="layout">
+    <aside>
+      <button class="btn primary" id="newBtn">+ 새 플레이리스트</button>
+      <div id="items"></div>
+    </aside>
+    <main>
+      <div id="editorEmpty" class="hint">왼쪽에서 플레이리스트를 고르거나 새로 만드세요.</div>
+      <form id="editor" class="hidden">
+        <div class="editor">
+          <div class="cover-box">
+            <div class="cover-prev" id="coverPrev">커버 없음</div>
+            <input type="file" id="coverFile" accept="image/jpeg,image/png,image/webp" class="hidden">
+            <button type="button" class="btn small" id="coverBtn">커버 이미지 선택</button>
+            <p class="hint">jpg · png · webp. 큰 이미지는 저장할 때 자동으로 줄여요.</p>
+          </div>
+          <div class="fields">
+            <label class="field"><span>제목</span><input type="text" id="fTitle" placeholder="예: 가을맞이" required></label>
+            <div class="row">
+              <label class="field grow"><span>유튜브 뮤직 재생목록 링크</span>
+                <input type="text" id="fLink" placeholder="https://music.youtube.com/playlist?list=..." required></label>
+              <button type="button" class="btn" id="fetchBtn">곡 목록 불러오기</button>
+            </div>
+            <p class="hint">재생목록은 <b>공개</b> 또는 <b>일부 공개</b>여야 시청자가 들을 수 있어요.</p>
+            <div class="row">
+              <label class="field" style="width:190px"><span>날짜</span><input type="date" id="fDate"></label>
+              <label class="check" style="margin-bottom:10px"><input type="checkbox" id="fShowDate" checked> 재생 화면에 날짜 표시</label>
+            </div>
+            <label class="check"><input type="checkbox" id="fPub" checked> 사이트에 공개</label>
+            <p class="hint">첫 화면에 나오는 순서는 왼쪽 목록을 끌어서 바꿔요.</p>
+          </div>
+        </div>
+
+        <div class="theme-sec">
+          <div class="tracks-head" style="margin-top:0">
+            <h2>배경 색</h2>
+          </div>
+          <p class="hint" style="margin-bottom:12px">완성된 플리 사진을 올리면 배경 색을 자동으로 뽑아요. 아홉 칸은 화면의 같은 위치 색이고, 하나씩 눌러 고칠 수도 있어요.
+            색을 지우면 커버를 흐리게 깐 배경을 써요.</p>
+          <div class="theme-wrap">
+            <div class="preview" id="preview">
+              <div class="pbg" id="pBg"></div><div class="ptint"></div>
+              <div class="pcov" id="pCov"></div>
+              <div class="plines"><i style="width:70%"></i><i style="width:55%"></i><i style="width:80%"></i><i style="width:62%"></i>
+                <i style="width:75%"></i><i style="width:50%"></i><i style="width:68%"></i><i style="width:58%"></i></div>
+            </div>
+            <div class="theme-side">
+              <div class="swatches" id="swatches"></div>
+              <div class="theme-btns">
+                <input type="file" id="shotFile" accept="image/*" class="hidden">
+                <button type="button" class="btn small" id="shotBtn">플리 사진에서 가져오기</button>
+                <button type="button" class="btn small hidden" id="cropBtn">이 사진에서 커버도 잘라 쓰기</button>
+                <button type="button" class="btn small" id="clearThemeBtn">색 지우기</button>
+              </div>
+              <p class="hint" id="shotInfo"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="tracks-head">
+          <h2>곡 목록 <span class="hint" id="trackCount"></span></h2>
+          <button type="button" class="btn small" id="addTrackBtn">+ 직접 추가</button>
+        </div>
+        <p class="hint" style="margin-bottom:10px">시청자 화면 오른쪽에 보이는 이름이에요. 사진과 다르게 나온 이름만 고치면 돼요.
+          "불러오기"를 다시 누르면 재생목록에 새로 생긴 곡만 추가되고, 고친 이름은 유지돼요.</p>
+        <div class="tracks" id="tracks"></div>
+
+        <div class="savebar">
+          <button type="submit" class="btn primary" id="saveBtn">저장</button>
+          <button type="button" class="btn" id="viewBtn">사이트에서 보기</button>
+          <span class="space"></span>
+          <button type="button" class="btn danger" id="deleteBtn">삭제</button>
+        </div>
+      </form>
+    </main>
+  </div>
+</section>
+
+<script src="vendor/supabase.js"></script>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+const { cfg, db, coverUrl, parsePlaylistId, normalizeTracks, escapeHtml, toast,
+        isValidTheme, extractTheme, cropCover, themeImage, loadImageFile } = window.App;
+const $ = id => document.getElementById(id);
+
+let all = [];            // 전체 플레이리스트 (비공개 포함)
+let edit = null;         // 편집 중인 항목 { id, isNew, cover_path, tracks, ... }
+let newCoverBlob = null; // 새로 고른 커버 (저장 전)
+let shotImg = null;      // 방금 올린 플리 사진 (커버 잘라 쓰기용)
+let dirty = false;
+
+/* ===================== 로그인 ===================== */
+async function boot() {
+  const { data } = await db.auth.getSession();
+  if (data.session) await enter(data.session);
+  else show("login");
+}
+function show(which) {
+  $("loginView").classList.toggle("hidden", which !== "login");
+  $("adminView").classList.toggle("hidden", which !== "admin");
+}
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  $("loginErr").textContent = "";
+  $("loginBtn").disabled = true;
+  const { data, error } = await db.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+  $("loginBtn").disabled = false;
+  if (error) { $("loginErr").textContent = "이메일 또는 비밀번호가 맞지 않아요."; return; }
+  await enter(data.session);
+});
+async function enter(session) {
+  const { data, error } = await db.from("admins").select("user_id").eq("user_id", session.user.id).maybeSingle();
+  if (error || !data) {
+    await db.auth.signOut();
+    show("login");
+    $("loginErr").textContent = error
+      ? "관리자 확인 중 오류가 났어요: " + error.message + (error.code ? " (" + error.code + ")" : "")
+      : "관리 권한이 없는 계정이에요. (admins 테이블에 이 계정이 없어요)";
+    return;
+  }
+  $("who").textContent = session.user.email;
+  show("admin");
+  await loadAll();
+}
+$("logoutBtn").onclick = async () => {
+  if (dirty && !confirm("저장하지 않은 변경이 있어요. 로그아웃할까요?")) return;
+  await db.auth.signOut();
+  location.reload();
+};
+
+/* ===================== 목록 ===================== */
+async function loadAll(selectId) {
+  const { data, error } = await db.from("playlists").select("*")
+    .order("sort_order", { ascending: true }).order("created_at", { ascending: false });
+  if (error) { toast("목록을 불러오지 못했어요: " + error.message, 6000); return; }
+  all = data.map(p => ({ ...p, tracks: normalizeTracks(p.tracks) }));
+  renderItems();
+  if (selectId) select(selectId);
+}
+function renderItems() {
+  const box = $("items");
+  box.innerHTML = "";
+  if (!all.length) box.innerHTML = '<p class="hint" style="padding:8px">아직 플레이리스트가 없어요.</p>';
+  for (const p of all) {
+    const d = document.createElement("div");
+    d.className = "item" + (edit && edit.id === p.id ? " sel" : "");
+    d.innerHTML = `<div class="th"></div><div class="meta">
+        <div class="nm">${escapeHtml(p.title)}${p.is_published ? "" : '<span class="badge">비공개</span>'}</div>
+        <div class="sub">${p.tracks.length}곡${p.playlist_date ? " · " + p.playlist_date.replaceAll("-", ".") : ""}</div></div>
+        <span class="grip" title="끌어서 순서 바꾸기">⋮⋮</span>`;
+    if (p.cover_path) d.querySelector(".th").style.backgroundImage = `url("${coverUrl(p.cover_path)}")`;
+    d.onclick = () => select(p.id);
+    d.draggable = true;
+    d.dataset.id = p.id;
+    d.addEventListener("dragstart", e => { dragId = p.id; d.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; });
+    d.addEventListener("dragend", () => { dragId = null; d.classList.remove("dragging"); clearDropMarks(); });
+    d.addEventListener("dragover", e => {
+      if (!dragId || dragId === p.id) return;
+      e.preventDefault();
+      const after = e.offsetY > d.clientHeight / 2;
+      clearDropMarks();
+      d.classList.add(after ? "drop-after" : "drop-before");
+    });
+    d.addEventListener("drop", e => {
+      e.preventDefault();
+      if (!dragId || dragId === p.id) return;
+      const after = d.classList.contains("drop-after");
+      clearDropMarks();
+      moveItem(dragId, p.id, after);
+    });
+    box.appendChild(d);
+  }
+}
+
+/* 끌어서 순서 바꾸기 → sort_order를 0, 10, 20 … 으로 다시 매겨 저장 */
+let dragId = null;
+function clearDropMarks() {
+  document.querySelectorAll(".drop-before, .drop-after").forEach(x => x.classList.remove("drop-before", "drop-after"));
+}
+async function moveItem(fromId, toId, after) {
+  const from = all.findIndex(p => p.id === fromId);
+  const [moved] = all.splice(from, 1);
+  let to = all.findIndex(p => p.id === toId);
+  if (after) to++;
+  all.splice(to, 0, moved);
+  const changed = [];
+  all.forEach((p, i) => { if (p.sort_order !== i * 10) { p.sort_order = i * 10; changed.push(p); } });
+  renderItems();
+  if (!changed.length) return;
+  const results = await Promise.all(changed.map(p =>
+    db.from("playlists").update({ sort_order: p.sort_order }).eq("id", p.id)));
+  const failed = results.find(r => r.error);
+  if (failed) { toast("순서 저장 실패: " + failed.error.message, 6000); await loadAll(edit && edit.id); }
+  else toast("순서를 저장했어요.", 1500);
+}
+
+/* ===================== 편집기 ===================== */
+function guardDirty() { return !dirty || confirm("저장하지 않은 변경이 있어요. 버리고 넘어갈까요?"); }
+
+function select(id) {
+  if (edit && edit.id === id) return;
+  if (!guardDirty()) return;
+  const p = all.find(x => x.id === id);
+  if (!p) return;
+  openEditor({ ...p, tracks: p.tracks.map(t => ({ ...t })), isNew: false,
+               theme: p.theme ? JSON.parse(JSON.stringify(p.theme)) : null });
+}
+$("newBtn").onclick = () => {
+  if (!guardDirty()) return;
+  openEditor({ id: crypto.randomUUID(), isNew: true, title: "", yt_list_id: "", cover_path: null,
+               tracks: [], is_published: true, theme: null,
+               sort_order: all.length ? Math.min(...all.map(p => p.sort_order)) - 10 : 0,   // 새 플리는 맨 앞
+               playlist_date: new Date().toLocaleDateString("sv-SE"), show_date: true });
+};
+function openEditor(p) {
+  edit = p;
+  newCoverBlob = null;
+  $("editorEmpty").classList.add("hidden");
+  $("editor").classList.remove("hidden");
+  $("fTitle").value = p.title;
+  $("fLink").value = p.yt_list_id ? "https://music.youtube.com/playlist?list=" + p.yt_list_id : "";
+  $("fDate").value = p.playlist_date || "";
+  $("fShowDate").checked = p.show_date !== false;
+  $("fPub").checked = p.is_published;
+  setCoverPreview(p.cover_path ? coverUrl(p.cover_path) : "");
+  shotImg = null;
+  $("cropBtn").classList.add("hidden");
+  $("shotInfo").textContent = "";
+  if (!isValidTheme(edit.theme)) edit.theme = null;
+  renderTheme();
+  $("deleteBtn").classList.toggle("hidden", p.isNew);
+  $("viewBtn").classList.toggle("hidden", p.isNew);
+  renderTracks();
+  renderItems();
+  dirty = false;
+  if (p.isNew) $("fTitle").focus();
+}
+["fTitle", "fLink", "fDate", "fShowDate", "fPub"].forEach(id => $(id).addEventListener("input", () => dirty = true));
+window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+/* 커버 */
+function setCoverPreview(url) {
+  const el = $("coverPrev");
+  el.style.backgroundImage = url ? `url("${url}")` : "";
+  el.classList.toggle("has", !!url);
+  el.textContent = url ? "" : "커버 없음";
+  $("pCov").style.backgroundImage = url ? `url("${url}")` : "";
+  if (edit && !edit.theme) renderTheme();
+}
+$("coverBtn").onclick = () => $("coverFile").click();
+$("coverFile").addEventListener("change", async () => {
+  const f = $("coverFile").files[0];
+  $("coverFile").value = "";
+  if (!f) return;
+  if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return toast("jpg, png, webp 이미지만 올릴 수 있어요.");
+  try {
+    newCoverBlob = await shrinkImage(f, 1000);
+    setCoverPreview(URL.createObjectURL(newCoverBlob));
+    dirty = true;
+  } catch (e) { toast("이미지를 읽지 못했어요."); }
+});
+/** 긴 변을 max px 이하로 줄이고 jpg로 변환 (저장 공간·로딩 절약) */
+async function shrinkImage(file, max) {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(bmp.width * scale);
+  c.height = Math.round(bmp.height * scale);
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  return await new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(), "image/jpeg", 0.9));
+}
+
+/* 배경 색 */
+const DEFAULT_GRID = [["#8f6a57", "#b9a7a0", "#8f6a57"], ["#9d7e6e", "#c9b9b3", "#9d7e6e"], ["#8a6250", "#b7a29a", "#8a6250"]];
+function renderTheme() {
+  const box = $("swatches");
+  const grid = edit.theme ? edit.theme.grid : DEFAULT_GRID;
+  box.innerHTML = "";
+  grid.forEach((row, y) => row.forEach((hex, x) => {
+    const inp = document.createElement("input");
+    inp.type = "color";
+    inp.value = hex;
+    inp.title = ["왼쪽 위", "위 가운데", "오른쪽 위", "왼쪽 가운데", "가운데", "오른쪽 가운데", "왼쪽 아래", "아래 가운데", "오른쪽 아래"][y * 3 + x];
+    inp.addEventListener("input", () => {
+      if (!edit.theme) edit.theme = { grid: DEFAULT_GRID.map(r => r.slice()) };
+      edit.theme.grid[y][x] = inp.value;
+      dirty = true;
+      drawPreview();
+    });
+    box.appendChild(inp);
+  }));
+  drawPreview();
+}
+function drawPreview() {
+  const pv = $("preview");
+  if (edit.theme) {
+    pv.classList.remove("plain");
+    $("pBg").style.backgroundImage = `url("${themeImage(edit.theme)}")`;
+  } else {
+    pv.classList.add("plain");
+    const cov = $("pCov").style.backgroundImage;
+    $("pBg").style.backgroundImage = cov || "";
+  }
+}
+$("shotBtn").onclick = () => $("shotFile").click();
+$("shotFile").addEventListener("change", async () => {
+  const f = $("shotFile").files[0];
+  $("shotFile").value = "";
+  if (!f) return;
+  try {
+    const img = await loadImageFile(f);
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (Math.abs(w / h - 16 / 9) > 0.08) toast("사진 비율이 16:9가 아니라서 색 위치가 조금 어긋날 수 있어요.", 5000);
+    edit.theme = extractTheme(img);
+    shotImg = img;
+    dirty = true;
+    renderTheme();
+    const coverPx = Math.round(Math.min(0.267 * w, 0.479 * h));
+    $("cropBtn").classList.remove("hidden");
+    $("shotInfo").textContent = `사진 ${w}×${h} → 잘라 쓰면 커버는 약 ${coverPx}×${coverPx}px` +
+      (coverPx < 600 ? " (원본 커버보다 흐릴 수 있어요)" : "");
+    const hasCover = !!(edit.cover_path || newCoverBlob);
+    if (!hasCover) { await useCroppedCover(); toast("배경 색을 가져오고, 커버가 없어서 사진에서 잘라 넣었어요."); }
+    else toast("배경 색을 가져왔어요. 커버는 그대로예요.");
+  } catch (e) { toast("사진을 읽지 못했어요."); }
+});
+async function useCroppedCover() {
+  if (!shotImg) return;
+  const { blob } = await cropCover(shotImg);
+  newCoverBlob = blob;
+  setCoverPreview(URL.createObjectURL(blob));
+  dirty = true;
+}
+$("cropBtn").onclick = async () => { await useCroppedCover(); toast("사진에서 커버를 잘라 넣었어요. 저장해야 반영돼요."); };
+$("clearThemeBtn").onclick = () => { edit.theme = null; dirty = true; renderTheme(); };
+
+/* 곡 목록 */
+function renderTracks() {
+  const box = $("tracks");
+  box.innerHTML = "";
+  $("trackCount").textContent = edit.tracks.length ? `(${edit.tracks.length}곡)` : "";
+  if (!edit.tracks.length) {
+    box.innerHTML = '<p class="empty-tracks">재생목록 링크를 넣고 "곡 목록 불러오기"를 누르세요.</p>';
+    return;
+  }
+  edit.tracks.forEach((t, i) => {
+    const r = document.createElement("div");
+    r.className = "tr";
+    r.innerHTML = `<span class="no">${i + 1}</span>
+      <input type="text" value="${escapeHtml(t.name)}" aria-label="${i + 1}번 곡 이름">
+      <span class="vid" title="${t.videoId ? "유튜브 영상 ID: " + t.videoId : "직접 추가한 곡 (순서로 재생 위치를 맞춤)"}">${t.videoId || "직접 추가"}</span>
+      <span class="acts">
+        <button type="button" class="btn small" data-a="up" ${i === 0 ? "disabled" : ""} aria-label="위로">↑</button>
+        <button type="button" class="btn small" data-a="down" ${i === edit.tracks.length - 1 ? "disabled" : ""} aria-label="아래로">↓</button>
+        <button type="button" class="btn small danger" data-a="del" aria-label="삭제">✕</button>
+      </span>`;
+    r.querySelector("input").addEventListener("input", e => { t.name = e.target.value; dirty = true; });
+    r.querySelectorAll("button").forEach(b => b.onclick = () => {
+      const a = b.dataset.a;
+      if (a === "del") edit.tracks.splice(i, 1);
+      if (a === "up") [edit.tracks[i - 1], edit.tracks[i]] = [edit.tracks[i], edit.tracks[i - 1]];
+      if (a === "down") [edit.tracks[i + 1], edit.tracks[i]] = [edit.tracks[i], edit.tracks[i + 1]];
+      dirty = true;
+      renderTracks();
+    });
+    box.appendChild(r);
+  });
+}
+$("addTrackBtn").onclick = () => {
+  edit.tracks.push({ name: "아티스트 - 곡명", videoId: null });
+  dirty = true;
+  renderTracks();
+  const inputs = $("tracks").querySelectorAll("input");
+  inputs[inputs.length - 1].select();
+};
+
+/* 유튜브에서 곡 목록 불러오기 (YouTube Data API: playlistItems.list) */
+$("fetchBtn").onclick = async () => {
+  const listId = parsePlaylistId($("fLink").value);
+  if (!listId) return toast("링크에서 재생목록 ID(list=...)를 찾지 못했어요.");
+  const btn = $("fetchBtn");
+  btn.disabled = true; btn.textContent = "불러오는 중…";
+  try {
+    const items = await fetchPlaylistItems(listId);
+    const known = new Map(edit.tracks.filter(t => t.videoId).map(t => [t.videoId, t]));
+    let added = 0;
+    const merged = items.map(it => {
+      if (known.has(it.videoId)) return known.get(it.videoId);     // 고친 이름 유지
+      added++;
+      return it;
+    });
+    const manual = edit.tracks.filter(t => !t.videoId);           // 직접 추가한 곡은 뒤에 유지
+    const removed = edit.tracks.filter(t => t.videoId && !items.some(it => it.videoId === t.videoId)).length;
+    edit.tracks = merged.concat(manual);
+    dirty = true;
+    renderTracks();
+    toast(`${items.length}곡을 확인했어요. 새로 추가 ${added}곡${removed ? `, 재생목록에서 빠진 곡 ${removed}곡 제거` : ""}.`, 5000);
+  } catch (e) {
+    toast(e.message, 8000);
+  } finally {
+    btn.disabled = false; btn.textContent = "곡 목록 불러오기";
+  }
+};
+async function fetchPlaylistItems(listId) {
+  const out = [];
+  let pageToken = "";
+  for (let page = 0; page < 10; page++) {           // 최대 500곡
+    const u = new URL("https://www.googleapis.com/youtube/v3/playlistItems");
+    u.search = new URLSearchParams({ part: "snippet", maxResults: "50", playlistId: listId, key: cfg.YOUTUBE_API_KEY,
+                                     ...(pageToken ? { pageToken } : {}) });
+    const res = await fetch(u);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const reason = json.error && json.error.errors && json.error.errors[0] && json.error.errors[0].reason;
+      if (reason === "playlistNotFound") throw new Error("재생목록을 찾을 수 없어요. 링크가 맞는지, 비공개가 아닌지 확인해 주세요.");
+      if (res.status === 403) throw new Error("유튜브 API가 요청을 거부했어요. API 키 설정(사용 설정, 주소 제한)을 확인해 주세요. (" + (reason || res.status) + ")");
+      throw new Error("곡 목록을 불러오지 못했어요. (" + (reason || res.status) + ")");
+    }
+    for (const it of json.items || []) {
+      const s = it.snippet || {};
+      const videoId = s.resourceId && s.resourceId.videoId;
+      if (!videoId || !s.videoOwnerChannelTitle) continue;     // 삭제·비공개 영상은 건너뜀
+      const artist = s.videoOwnerChannelTitle.replace(/ - Topic$/, "");
+      out.push({ name: `${artist} - ${s.title}`, videoId });
+    }
+    pageToken = json.nextPageToken;
+    if (!pageToken) break;
+  }
+  return out;
+}
+
+/* ===================== 저장 / 삭제 ===================== */
+$("editor").addEventListener("submit", async e => {
+  e.preventDefault();
+  const title = $("fTitle").value.trim();
+  const listId = parsePlaylistId($("fLink").value);
+  if (!title) return toast("제목을 입력해 주세요.");
+  if (!listId) return toast("재생목록 링크를 확인해 주세요.");
+  const tracks = edit.tracks.map(t => ({ name: t.name.trim(), videoId: t.videoId || null })).filter(t => t.name);
+
+  const btn = $("saveBtn");
+  btn.disabled = true; btn.textContent = "저장 중…";
+  try {
+    let cover_path = edit.cover_path;
+    const oldCover = edit.cover_path;
+    if (newCoverBlob) {
+      const isPng = newCoverBlob.type === "image/png";
+      const path = `${edit.id}/${Date.now()}.${isPng ? "png" : "jpg"}`;
+      const { error } = await db.storage.from("covers").upload(path, newCoverBlob,
+        { contentType: isPng ? "image/png" : "image/jpeg", upsert: false });
+      if (error) throw new Error("커버 업로드 실패: " + error.message);
+      cover_path = path;
+    }
+    const row = { title, yt_list_id: listId, cover_path, tracks, is_published: $("fPub").checked,
+                  theme: isValidTheme(edit.theme) ? edit.theme : null,
+                  playlist_date: $("fDate").value || null, show_date: $("fShowDate").checked };
+    // 순서(sort_order)는 왼쪽 목록에서 따로 저장하므로, 수정할 때는 건드리지 않음
+    const { error } = edit.isNew
+      ? await db.from("playlists").insert({ id: edit.id, sort_order: edit.sort_order, ...row })
+      : await db.from("playlists").update(row).eq("id", edit.id);
+    if (error) throw new Error("저장 실패: " + error.message);
+    if (newCoverBlob && oldCover) await db.storage.from("covers").remove([oldCover]);   // 예전 커버 정리
+    dirty = false;
+    newCoverBlob = null;
+    toast("저장했어요.");
+    const id = edit.id;
+    edit = null;
+    await loadAll(id);
+  } catch (err) {
+    toast(err.message, 7000);
+  } finally {
+    btn.disabled = false; btn.textContent = "저장";
+  }
+});
+
+$("deleteBtn").onclick = async () => {
+  if (!edit || edit.isNew) return;
+  if (!confirm(`'${edit.title}' 플레이리스트를 삭제할까요? 되돌릴 수 없어요.`)) return;
+  const { error } = await db.from("playlists").delete().eq("id", edit.id);
+  if (error) return toast("삭제 실패: " + error.message, 6000);
+  if (edit.cover_path) await db.storage.from("covers").remove([edit.cover_path]);
+  toast("삭제했어요.");
+  dirty = false;
+  edit = null;
+  $("editor").classList.add("hidden");
+  $("editorEmpty").classList.remove("hidden");
+  await loadAll();
+};
+
+$("viewBtn").onclick = () => { if (edit) window.open("index.html?p=" + encodeURIComponent(edit.id), "_blank", "noopener"); };
+
+boot();
+</script>
+</body>
+</html>
