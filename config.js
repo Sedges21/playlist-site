@@ -11,5 +11,5 @@ window.APP_CONFIG = {
   YOUTUBE_API_KEY: "AIzaSyCHvvUpg72sZrh0FMROgdibOZWPs488x7k",
 
   // 첫 화면 상단 제목
-  SITE_TITLE: "Playlists",
+  SITE_TITLE: "연청율 Playlists",
 };
